@@ -11,14 +11,25 @@
 
 let ws = new WebSocket("ws://localhost:8002/ws")
 
+ws.onopen = ()=>{
+console.log("Connected to chat server")
+}
+
 ws.onmessage = (event)=>{
+ console.log("Message received:", event.data)
+
  let li=document.createElement("li")
  li.innerText=event.data
  document.getElementById("chat").appendChild(li)
 }
 
+ws.onerror = (error)=>{
+ console.log("WebSocket error:", error)
+}
+
 function send(){
  let msg=document.getElementById("msg").value
+ console.log("Sending:", msg)
  ws.send(msg)
 }
 

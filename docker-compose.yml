@@ -1,17 +1,28 @@
-version: "3.8"
+version: "3.9"
 
 services:
 
-  mongodb:
-    image: mongo:6
-    container_name: chat_mongodb
-    restart: always
+  auth-service:
+    build: ./auth-service
     ports:
-      - "27017:27017"
+      - "8001:8001"
 
-  redis:
-    image: redis:7
-    container_name: chat_redis
-    restart: always
+  chat-service:
+    build: ./chat-service
     ports:
-      - "6379:6379"
+      - "8002:8002"
+
+  presence-service:
+    build: ./presence-service
+    ports:
+      - "8003:8003"
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "8004:8004"
+
+  media-service:
+    build: ./media-service
+    ports:
+      - "8005:8005"

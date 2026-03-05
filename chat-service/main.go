@@ -4,37 +4,24 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 var clients = make(map[*websocket.Conn]bool)
 
-func main() {
+var broadcast = make(chan []byte)
 
-	router := gin.Default()
+func handleConnections(w http.ResponseWriter, r *http.Request) {
 
-	router.GET("/ws", handleConnections)
-
-	router.Run(":8002")
-}
-
-func handleConnections(c *gin.Context) {
-
-	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-
+	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
-	defer ws.Close()
 
 	clients[ws] = true
 
@@ -47,19 +34,41 @@ func handleConnections(c *gin.Context) {
 			break
 		}
 
-		broadcast(msg)
+		broadcast <- msg
+
 	}
+
 }
 
-func broadcast(message []byte) {
+func handleMessages() {
 
-	for client := range clients {
+	for {
 
-		err := client.WriteMessage(websocket.TextMessage, message)
+		msg := <-broadcast
 
-		if err != nil {
-			client.Close()
-			delete(clients, client)
+		for client := range clients {
+
+			err := client.WriteMessage(websocket.TextMessage, msg)
+
+			if err != nil {
+				client.Close()
+				delete(clients, client)
+			}
+
 		}
+
 	}
+
+}
+
+func main() {
+
+	http.HandleFunc("/ws", handleConnections)
+
+	go handleMessages()
+
+	log.Println("Chat Service running on 8002")
+
+	http.ListenAndServe(":8002", nil)
+
 }
