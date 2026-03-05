@@ -2,7 +2,7 @@
 <html>
 
 <head>
-<title>Private Chat</title>
+<title>Login Chat System</title>
 
 <style>
 
@@ -15,11 +15,11 @@ align-items:center;
 height:100vh;
 }
 
-.container{
-width:450px;
+.box{
 background:white;
 padding:20px;
 border-radius:10px;
+width:400px;
 box-shadow:0 0 10px rgba(0,0,0,0.2);
 }
 
@@ -39,6 +39,10 @@ font-weight:bold;
 cursor:pointer;
 }
 
+.chat{
+display:none;
+}
+
 .messages{
 height:250px;
 overflow-y:auto;
@@ -54,107 +58,190 @@ margin:5px;
 border-radius:6px;
 }
 
-.self{
-background:#b2f2bb;
-text-align:right;
-}
-
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="box">
+
+<!-- 🔐 LOGIN SECTION -->
+<div id="loginSection">
+
+<h3>Login</h3>
+
+<input id="username" placeholder="Username"/>
+<input id="password" type="password" placeholder="Password"/>
+
+<button onclick="login()">Login</button>
+
+<p>OR</p>
+
+<button onclick="register()">Register</button>
+
+</div>
+
+<!-- 💬 CHAT SECTION -->
+<div id="chatSection" class="chat">
 
 <h3>Private Chat</h3>
 
-<input id="username" placeholder="Your Username"/>
-<input id="receiver" placeholder="Receiver Username"/>
-
-<button onclick="connect()">Connect</button>
-
+<input id="receiver" placeholder="Receiver"/>
 <div class="messages" id="messages"></div>
-
-<input id="message" placeholder="Type message"/>
-
+<input id="message" placeholder="Message"/>
 <button onclick="send()">Send</button>
+
+</div>
 
 </div>
 
 <script>
 
 let ws;
+let token;
 
-function connect(){
+function register(){
 
-let username = document.getElementById("username").value;
+fetch("http://localhost:8001/register",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+username:document.getElementById("username").value,
+password:document.getElementById("password").value
+})
+})
+.then(res=>{
 
-if(username === ""){
-alert("Enter username");
-return;
+if(!res.ok){
+throw new Error("Register Failed")
 }
 
-// 🔥 Open websocket
-ws = new WebSocket("ws://localhost:8002/ws");
+return res.text()
+
+})
+.then(()=>{
+alert("User Registered Successfully")
+})
+.catch(err=>{
+alert("Register Failed")
+console.log(err)
+})
+
+}
+
+function login(){
+
+fetch("http://localhost:8001/login",{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+username:document.getElementById("username").value,
+password:document.getElementById("password").value
+})
+})
+.then(res => {
+
+if(!res.ok){
+throw new Error("Login Failed")
+}
+
+return res.json()
+
+})
+.then(data => {
+
+token = data.token
+
+alert("Login Successful")
+
+document.getElementById("loginSection").style.display="none"
+document.getElementById("chatSection").style.display="block"
+
+connectWebSocket()
+
+})
+.catch(err=>{
+alert("Login Error")
+console.log(err)
+})
+
+}
+
+function connectWebSocket(){
+
+ws = new WebSocket("ws://localhost:8002/ws")
 
 ws.onopen = ()=>{
 
-// 🔥 Send username as FIRST MESSAGE
-ws.send(username);
+console.log("WebSocket Connected")
 
-console.log("Registered as", username);
+// 🔥 Send token FIRST
+ws.send(token)
 
-};
+}
 
+// ✅ When message comes from other tab
 ws.onmessage = (event)=>{
 
-let data = JSON.parse(event.data);
+let data = JSON.parse(event.data)
 
-let div = document.createElement("div");
-div.className = "msg";
+let div = document.createElement("div")
+div.className="msg"
 
-div.innerHTML = "<b>"+data.sender+"</b>: "+data.message;
+div.innerHTML="<b>"+data.sender+"</b>: "+data.message
 
-document.getElementById("messages").appendChild(div);
+document.getElementById("messages").appendChild(div)
 
-};
+}
 
-ws.onerror = (err)=>{
-console.log("WebSocket Error", err);
-};
+ws.onclose = ()=>{
+console.log("WebSocket Closed")
+}
 
 }
 
 function send(){
 
-if(!ws){
-alert("Connect first");
-return;
+if(!ws || ws.readyState !== WebSocket.OPEN){
+alert("WebSocket not connected")
+return
 }
 
-let sender = document.getElementById("username").value;
-let receiver = document.getElementById("receiver").value;
-let message = document.getElementById("message").value;
+let receiver = document.getElementById("receiver").value
+let message = document.getElementById("message").value
 
-if(message === "") return;
+if(message === "") return
 
-// ✅ Show locally
-let div = document.createElement("div");
-div.className = "msg self";
-div.innerHTML = "<b>You</b>: "+message;
-
-document.getElementById("messages").appendChild(div);
-
-// ✅ Send to backend
 let payload = {
-sender: sender,
+sender: parseJwt(token).username,
 receiver: receiver,
 message: message
-};
+}
 
-ws.send(JSON.stringify(payload));
+// 🔥 Show message locally immediately
+let div = document.createElement("div")
+div.className="msg"
+div.style.textAlign="right"
+div.innerHTML="<b>You</b>: "+message
 
-document.getElementById("message").value="";
+document.getElementById("messages").appendChild(div)
+
+// 🔥 Send to backend
+ws.send(JSON.stringify(payload))
+
+document.getElementById("message").value=""
+
+}
+
+function parseJwt(token){
+
+let base64 = token.split('.')[1]
+let decoded = atob(base64)
+return JSON.parse(decoded)
 
 }
 
