@@ -1,74 +1,91 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
+
+type Message struct {
+	Sender   string `json:"sender"`
+	Receiver string `json:"receiver"`
+	Message  string `json:"message"`
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-var clients = make(map[*websocket.Conn]bool)
+var (
+	clients = make(map[string]*websocket.Conn)
+	mu      sync.Mutex
+)
 
-var broadcast = make(chan []byte)
+func wsHandler(w http.ResponseWriter, r *http.Request) {
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
-
-	ws, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Println("Upgrade error:", err)
 		return
 	}
 
-	clients[ws] = true
+	// 🔥 Step 1 — First message MUST be username
+	_, usernameBytes, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return
+	}
 
+	username := string(usernameBytes)
+
+	mu.Lock()
+	clients[username] = conn
+	mu.Unlock()
+
+	log.Println("User registered:", username)
+
+	// 🔥 Step 2 — Listen for messages
 	for {
 
-		_, msg, err := ws.ReadMessage()
-
+		_, msgBytes, err := conn.ReadMessage()
 		if err != nil {
-			delete(clients, ws)
+
+			mu.Lock()
+			delete(clients, username)
+			mu.Unlock()
+
+			log.Println("User disconnected:", username)
 			break
 		}
 
-		broadcast <- msg
-
-	}
-
-}
-
-func handleMessages() {
-
-	for {
-
-		msg := <-broadcast
-
-		for client := range clients {
-
-			err := client.WriteMessage(websocket.TextMessage, msg)
-
-			if err != nil {
-				client.Close()
-				delete(clients, client)
-			}
-
+		var msg Message
+		err = json.Unmarshal(msgBytes, &msg)
+		if err != nil {
+			continue
 		}
 
+		mu.Lock()
+		receiverConn := clients[msg.Receiver]
+		mu.Unlock()
+
+		if receiverConn != nil {
+
+			jsonMsg, _ := json.Marshal(msg)
+			receiverConn.WriteMessage(websocket.TextMessage, jsonMsg)
+
+		}
 	}
 
 }
 
 func main() {
 
-	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/ws", wsHandler)
 
-	go handleMessages()
+	log.Println("Private Chat Running on :8002")
 
-	log.Println("Chat Service running on 8002")
-
-	http.ListenAndServe(":8002", nil)
-
+	log.Fatal(http.ListenAndServe(":8002", nil))
 }

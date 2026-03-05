@@ -1,50 +1,24 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
-type User struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+func login(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "User Login Success")
+}
+
+func register(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "User Registered")
 }
 
 func main() {
 
-	r := gin.Default()
+	http.HandleFunc("/login", login)
+	http.HandleFunc("/register", register)
 
-	r.POST("/register", registerUser)
-	r.POST("/login", loginUser)
+	fmt.Println("Auth Service running on 8001")
+	http.ListenAndServe(":8001", nil)
 
-	r.Run(":8001")
-}
-
-func registerUser(c *gin.Context) {
-
-	var user User
-
-	if err := c.BindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User registered",
-	})
-}
-
-func loginUser(c *gin.Context) {
-
-	var user User
-
-	if err := c.BindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"token": "dummy-jwt-token",
-	})
 }

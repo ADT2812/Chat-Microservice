@@ -2,37 +2,163 @@
 <html>
 
 <head>
-<title>Go Chat</title>
-<link rel="stylesheet" href="style.css">
+<title>Private Chat</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#ece5dd;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.container{
+width:450px;
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+
+input{
+width:100%;
+padding:8px;
+margin-bottom:8px;
+}
+
+button{
+width:100%;
+padding:10px;
+background:#25D366;
+border:none;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+.messages{
+height:250px;
+overflow-y:auto;
+border:1px solid #ddd;
+padding:10px;
+margin-bottom:10px;
+}
+
+.msg{
+background:#dcf8c6;
+padding:6px;
+margin:5px;
+border-radius:6px;
+}
+
+.self{
+background:#b2f2bb;
+text-align:right;
+}
+
+</style>
 </head>
 
 <body>
 
 <div class="container">
 
-<div class="users">
-<h3>Online Users</h3>
-<ul>
-<li>Aditi 🟢</li>
-<li>John</li>
-<li>Sam</li>
-</ul>
-</div>
+<h3>Private Chat</h3>
 
-<div class="chat">
+<input id="username" placeholder="Your Username"/>
+<input id="receiver" placeholder="Receiver Username"/>
 
-<div id="messages" class="messages"></div>
+<button onclick="connect()">Connect</button>
 
-<div class="inputBox">
-<input id="msg" placeholder="Type message"/>
+<div class="messages" id="messages"></div>
+
+<input id="message" placeholder="Type message"/>
+
 <button onclick="send()">Send</button>
-</div>
 
 </div>
 
-</div>
+<script>
 
-<script src="app.js"></script>
+let ws;
+
+function connect(){
+
+let username = document.getElementById("username").value;
+
+if(username === ""){
+alert("Enter username");
+return;
+}
+
+// 🔥 Open websocket
+ws = new WebSocket("ws://localhost:8002/ws");
+
+ws.onopen = ()=>{
+
+// 🔥 Send username as FIRST MESSAGE
+ws.send(username);
+
+console.log("Registered as", username);
+
+};
+
+ws.onmessage = (event)=>{
+
+let data = JSON.parse(event.data);
+
+let div = document.createElement("div");
+div.className = "msg";
+
+div.innerHTML = "<b>"+data.sender+"</b>: "+data.message;
+
+document.getElementById("messages").appendChild(div);
+
+};
+
+ws.onerror = (err)=>{
+console.log("WebSocket Error", err);
+};
+
+}
+
+function send(){
+
+if(!ws){
+alert("Connect first");
+return;
+}
+
+let sender = document.getElementById("username").value;
+let receiver = document.getElementById("receiver").value;
+let message = document.getElementById("message").value;
+
+if(message === "") return;
+
+// ✅ Show locally
+let div = document.createElement("div");
+div.className = "msg self";
+div.innerHTML = "<b>You</b>: "+message;
+
+document.getElementById("messages").appendChild(div);
+
+// ✅ Send to backend
+let payload = {
+sender: sender,
+receiver: receiver,
+message: message
+};
+
+ws.send(JSON.stringify(payload));
+
+document.getElementById("message").value="";
+
+}
+
+</script>
 
 </body>
 </html>
