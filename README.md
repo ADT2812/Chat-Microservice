@@ -1,4 +1,10 @@
 💬 Chat Microservice
+Login page
+<img width="544" height="378" alt="Screenshot 2026-03-13 083016" src="https://github.com/user-attachments/assets/58136812-0209-481b-ae16-bd1c3ce73578" />
+
+Chat window 
+<img width="554" height="629" alt="Screenshot 2026-03-13 083225" src="https://github.com/user-attachments/assets/aaea1462-e33f-44db-8c58-8ce87118683d" />
+
 
 A simple real-time chat backend built using Go and a microservices approach. The project includes separate services for authentication and chat, along with a basic frontend for testing.
 
